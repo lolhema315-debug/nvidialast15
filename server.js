@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // NVIDIA NIM API configuration
 const NIM_API_BASE = process.env.NIM_API_BASE || 'https://integrate.api.nvidia.com/v1';
@@ -22,13 +22,13 @@ const ENABLE_THINKING_MODE = false; // Set to true to enable chat_template_kwarg
 
 // Model mapping (adjust based on available NIM models)
 const MODEL_MAPPING = {
-  'gpt-3.5-turbo': 'z-ai/glm-5.2',
+  'gpt-3.5-turbo': 'meta/muse-glimmer-30b',
   'gpt-4': 'moonshotai/kimi-k3',
-  'gpt-4-turbo': 'moonshotai/kimi-k2-instruct-0905',
-  'gpt-4o': 'nvidia/nemotron-3-ultra-550b-a55b',
+  'gpt-4-turbo': 'deepseek-ai/deepseek-v4-flash-0731',
+  'gpt-4o': 'deepseek-ai/deepseek-v4-pro-0813',
   'claude-3-opus': 'openai/gpt-oss-120b',
   'claude-3-sonnet': 'openai/gpt-oss-20b',
-  'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking' 
+  'gemini-pro': 'google/gemma-4-31b-it' 
 };
 
 // Health check endpoint
@@ -243,3 +243,4 @@ app.listen(PORT, () => {
   console.log(`Reasoning display: ${SHOW_REASONING ? 'ENABLED' : 'DISABLED'}`);
   console.log(`Thinking mode: ${ENABLE_THINKING_MODE ? 'ENABLED' : 'DISABLED'}`);
 });
+
