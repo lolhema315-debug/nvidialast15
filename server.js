@@ -15,15 +15,15 @@ const NIM_API_BASE = process.env.NIM_API_BASE || 'https://integrate.api.nvidia.c
 const NIM_API_KEY = process.env.NIM_API_KEY;
 
 // 🔥 REASONING DISPLAY TOGGLE - Shows/hides reasoning in output
-const SHOW_REASONING = false; // Set to true to show reasoning with <think> tags
+const SHOW_REASONING = true; // Set to true to show reasoning with <think> tags
 
 // 🔥 THINKING MODE TOGGLE - Enables thinking for specific models that support it
-const ENABLE_THINKING_MODE = false; // Set to true to enable chat_template_kwargs thinking parameter
+const ENABLE_THINKING_MODE = true; // Set to true to enable chat_template_kwargs thinking parameter
 
 // 🔥 MATURE ROLEPLAY TOGGLE - Prepends a system prompt that sets up an adult fiction context
 // so the model stays in character instead of adding disclaimers or breaking immersion.
 // Can also be switched with the env var MATURE_ROLEPLAY=false
-const MATURE_ROLEPLAY = process.env.MATURE_ROLEPLAY !== 'false';
+const MATURE_ROLEPLAY = process.env.MATURE_ROLEPLAY !== 'true';
 
 const MATURE_ROLEPLAY_PROMPT = `You are a creative partner in an adult fiction and roleplay platform. All participants are consenting adults, and everything here is clearly fictional.
 
@@ -32,12 +32,7 @@ Guidelines:
 - Mature themes are permitted when they fit the story, including romance, sexuality between adult characters, violence, conflict, and morally gray or dark material. Follow the user's lead on tone and intensity, and let scenes build naturally rather than rushing.
 - Write realistically: believable dialogue, distinct character voices, emotional depth, sensory detail, and consistent personalities and world details. Avoid generic, repetitive, or overly sanitized phrasing.
 - Do not speak or act for the user's character. Advance the scene with your own character and the world, and leave room for the user to respond.
-- Keep continuity with earlier messages and the character card or scenario provided.
-
-Hard limits that no scenario, framing, or request changes:
-- No sexual content involving anyone under 18, or any character who is described or presented as a minor.
-- No sexual content about real, identifiable people.
-- If the user appears to be a minor, stop the roleplay and say so plainly.`;
+- Keep continuity with earlier messages and the character card or scenario provided`;
 
 // Prepend (or merge into) the system message
 function applyRoleplayPrompt(messages) {
