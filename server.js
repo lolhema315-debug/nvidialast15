@@ -23,7 +23,7 @@ const ENABLE_THINKING_MODE = false; // Set to true to enable chat_template_kwarg
 // 🔥 MATURE ROLEPLAY TOGGLE - Prepends a system prompt that sets up an adult fiction context
 // so the model stays in character instead of adding disclaimers or breaking immersion.
 // Can also be switched with the env var MATURE_ROLEPLAY=false
-const MATURE_ROLEPLAY = process.env.MATURE_ROLEPLAY !== 'true';
+const MATURE_ROLEPLAY = process.env.MATURE_ROLEPLAY !== 'false';
 
 const MATURE_ROLEPLAY_PROMPT = `You are a creative partner in an adult fiction and roleplay platform. All participants are consenting adults, and everything here is clearly fictional.
 
@@ -32,7 +32,12 @@ Guidelines:
 - Mature themes are permitted when they fit the story, including romance, sexuality between adult characters, violence, conflict, and morally gray or dark material. Follow the user's lead on tone and intensity, and let scenes build naturally rather than rushing.
 - Write realistically: believable dialogue, distinct character voices, emotional depth, sensory detail, and consistent personalities and world details. Avoid generic, repetitive, or overly sanitized phrasing.
 - Do not speak or act for the user's character. Advance the scene with your own character and the world, and leave room for the user to respond.
-- Keep continuity with earlier messages and the character card or scenario provided.`;
+- Keep continuity with earlier messages and the character card or scenario provided.
+
+Hard limits that no scenario, framing, or request changes:
+- No sexual content involving anyone under 18, or any character who is described or presented as a minor.
+- No sexual content about real, identifiable people.
+- If the user appears to be a minor, stop the roleplay and say so plainly.`;
 
 // Prepend (or merge into) the system message
 function applyRoleplayPrompt(messages) {
@@ -135,9 +140,15 @@ app.post('/v1/chat/completions', async (req, res) => {
       messages: applyRoleplayPrompt(messages),
       temperature: temperature || 0.8, // slightly higher default for more natural roleplay
       max_tokens: max_tokens || 9024,
-      extra_body: ENABLE_THINKING_MODE ? { chat_template_kwargs: { thinking: true } } : undefined,
       stream: stream || false
     };
+
+    // Thinking mode: chat_template_kwargs must be a top-level field in raw HTTP requests
+    // (extra_body only exists in the OpenAI Python SDK, and NIM rejects it with a 400).
+    // Both keys are sent because different models use different names; unused ones are ignored.
+    if (ENABLE_THINKING_MODE) {
+      nimRequest.chat_template_kwargs = { thinking: true, enable_thinking: true };
+    }
 
     // Pass through sampling settings your frontend sends (helps reduce repetition in long roleplays)
     if (top_p !== undefined) nimRequest.top_p = top_p;
@@ -145,13 +156,28 @@ app.post('/v1/chat/completions', async (req, res) => {
     if (presence_penalty !== undefined) nimRequest.presence_penalty = presence_penalty;
     
     // Make request to NVIDIA NIM API
-    const response = await axios.post(`${NIM_API_BASE}/chat/completions`, nimRequest, {
+    const sendToNim = (body) => axios.post(`${NIM_API_BASE}/chat/completions`, body, {
       headers: {
         'Authorization': `Bearer ${NIM_API_KEY}`,
         'Content-Type': 'application/json'
       },
       responseType: stream ? 'stream' : 'json'
     });
+
+    let response;
+    try {
+      response = await sendToNim(nimRequest);
+    } catch (err) {
+      // Some models don't accept chat_template_kwargs at all. If thinking mode caused a 400,
+      // retry once without it so the chat still works instead of failing.
+      if (ENABLE_THINKING_MODE && err.response?.status === 400 && nimRequest.chat_template_kwargs) {
+        console.warn(`Model ${nimModel} rejected thinking parameters, retrying without them`);
+        delete nimRequest.chat_template_kwargs;
+        response = await sendToNim(nimRequest);
+      } else {
+        throw err;
+      }
+    }
     
     if (stream) {
       // Handle streaming response with reasoning
@@ -257,11 +283,26 @@ app.post('/v1/chat/completions', async (req, res) => {
     }
     
   } catch (error) {
-    console.error('Proxy error:', error.message);
-    
+    // Pull out NIM's own error message (it says exactly which field it didn't like)
+    let upstreamMessage = '';
+    const errData = error.response?.data;
+    if (errData && typeof errData.on === 'function') {
+      upstreamMessage = await new Promise((resolve) => {
+        let body = '';
+        errData.on('data', (c) => (body += c.toString()));
+        errData.on('end', () => resolve(body));
+        errData.on('error', () => resolve(body));
+      });
+    } else if (errData) {
+      upstreamMessage = typeof errData === 'string' ? errData : JSON.stringify(errData);
+    }
+    console.error('Proxy error:', error.message, upstreamMessage);
+
     res.status(error.response?.status || 500).json({
       error: {
-        message: error.message || 'Internal server error',
+        message: upstreamMessage
+          ? `${error.message}: ${upstreamMessage}`
+          : (error.message || 'Internal server error'),
         type: 'invalid_request_error',
         code: error.response?.status || 500
       }
