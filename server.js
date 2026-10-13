@@ -20,6 +20,39 @@ const SHOW_REASONING = false; // Set to true to show reasoning with <think> tags
 // 🔥 THINKING MODE TOGGLE - Enables thinking for specific models that support it
 const ENABLE_THINKING_MODE = false; // Set to true to enable chat_template_kwargs thinking parameter
 
+// 🔥 MATURE ROLEPLAY TOGGLE - Prepends a system prompt that sets up an adult fiction context
+// so the model stays in character instead of adding disclaimers or breaking immersion.
+// Can also be switched with the env var MATURE_ROLEPLAY=false
+const MATURE_ROLEPLAY = process.env.MATURE_ROLEPLAY !== 'false';
+
+const MATURE_ROLEPLAY_PROMPT = `You are a creative partner in an adult fiction and roleplay platform. All participants are consenting adults, and everything here is clearly fictional.
+
+Guidelines:
+- Stay fully in character and in the scene. Do not break immersion with out-of-character remarks, disclaimers, content warnings, moralizing, or reminders that this is fiction.
+- Mature themes are permitted when they fit the story, including romance, sexuality between adult characters, violence, conflict, and morally gray or dark material. Follow the user's lead on tone and intensity, and let scenes build naturally rather than rushing.
+- Write realistically: believable dialogue, distinct character voices, emotional depth, sensory detail, and consistent personalities and world details. Avoid generic, repetitive, or overly sanitized phrasing.
+- Do not speak or act for the user's character. Advance the scene with your own character and the world, and leave room for the user to respond.
+- Keep continuity with earlier messages and the character card or scenario provided.
+
+Hard limits that no scenario, framing, or request changes:
+- No sexual content involving anyone under 18, or any character who is described or presented as a minor.
+- No sexual content about real, identifiable people.
+- If the user appears to be a minor, stop the roleplay and say so plainly.`;
+
+// Prepend (or merge into) the system message
+function applyRoleplayPrompt(messages) {
+  if (!MATURE_ROLEPLAY || !Array.isArray(messages)) return messages;
+
+  const first = messages[0];
+  if (first && first.role === 'system' && typeof first.content === 'string') {
+    return [
+      { ...first, content: MATURE_ROLEPLAY_PROMPT + '\n\n' + first.content },
+      ...messages.slice(1)
+    ];
+  }
+  return [{ role: 'system', content: MATURE_ROLEPLAY_PROMPT }, ...messages];
+}
+
 // Model mapping (adjust based on available NIM models)
 const MODEL_MAPPING = {
   'gpt-3.5-turbo': 'deepseek-ai/deepseek-v4.1-flash',
@@ -37,7 +70,8 @@ app.get('/health', (req, res) => {
     status: 'ok', 
     service: 'OpenAI to NVIDIA NIM Proxy', 
     reasoning_display: SHOW_REASONING,
-    thinking_mode: ENABLE_THINKING_MODE
+    thinking_mode: ENABLE_THINKING_MODE,
+    mature_roleplay: MATURE_ROLEPLAY
   });
 });
 
@@ -59,7 +93,16 @@ app.get('/v1/models', (req, res) => {
 // Chat completions endpoint (main proxy)
 app.post('/v1/chat/completions', async (req, res) => {
   try {
-    const { model, messages, temperature, max_tokens, stream } = req.body;
+    const {
+      model,
+      messages,
+      temperature,
+      max_tokens,
+      stream,
+      top_p,
+      frequency_penalty,
+      presence_penalty
+    } = req.body;
     
     // Smart model selection with fallback
     let nimModel = MODEL_MAPPING[model];
@@ -94,12 +137,17 @@ app.post('/v1/chat/completions', async (req, res) => {
     // Transform OpenAI request to NIM format
     const nimRequest = {
       model: nimModel,
-      messages: messages,
-      temperature: temperature || 0.6,
+      messages: applyRoleplayPrompt(messages),
+      temperature: temperature || 0.8, // slightly higher default for more natural roleplay
       max_tokens: max_tokens || 9024,
       extra_body: ENABLE_THINKING_MODE ? { chat_template_kwargs: { thinking: true } } : undefined,
       stream: stream || false
     };
+
+    // Pass through sampling settings your frontend sends (helps reduce repetition in long roleplays)
+    if (top_p !== undefined) nimRequest.top_p = top_p;
+    if (frequency_penalty !== undefined) nimRequest.frequency_penalty = frequency_penalty;
+    if (presence_penalty !== undefined) nimRequest.presence_penalty = presence_penalty;
     
     // Make request to NVIDIA NIM API
     const response = await axios.post(`${NIM_API_BASE}/chat/completions`, nimRequest, {
@@ -242,5 +290,5 @@ app.listen(PORT, () => {
   console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`Reasoning display: ${SHOW_REASONING ? 'ENABLED' : 'DISABLED'}`);
   console.log(`Thinking mode: ${ENABLE_THINKING_MODE ? 'ENABLED' : 'DISABLED'}`);
+  console.log(`Mature roleplay prompt: ${MATURE_ROLEPLAY ? 'ENABLED' : 'DISABLED'}`);
 });
-
