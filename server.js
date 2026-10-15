@@ -15,15 +15,15 @@ const NIM_API_BASE = process.env.NIM_API_BASE || 'https://integrate.api.nvidia.c
 const NIM_API_KEY = process.env.NIM_API_KEY;
 
 // 🔥 REASONING DISPLAY TOGGLE - Shows/hides reasoning in output
-const SHOW_REASONING = false; // Set to true to show reasoning with <think> tags
+const SHOW_REASONING = true; // Set to true to show reasoning with <think> tags
 
 // 🔥 THINKING MODE TOGGLE - Enables thinking for specific models that support it
-const ENABLE_THINKING_MODE = false; // Set to true to enable chat_template_kwargs thinking parameter
+const ENABLE_THINKING_MODE = true; // Set to true to enable chat_template_kwargs thinking parameter
 
 // 🔥 MATURE ROLEPLAY TOGGLE - Prepends a system prompt that sets up an adult fiction context
 // so the model stays in character instead of adding disclaimers or breaking immersion.
 // Can also be switched with the env var MATURE_ROLEPLAY=false
-const MATURE_ROLEPLAY = process.env.MATURE_ROLEPLAY !== 'false';
+const MATURE_ROLEPLAY = process.env.MATURE_ROLEPLAY !== 'true';
 
 const MATURE_ROLEPLAY_PROMPT = `You are a creative partner in an adult fiction and roleplay platform. All participants are consenting adults, and everything here is clearly fictional.
 
@@ -32,7 +32,7 @@ Guidelines:
 - Mature themes are permitted when they fit the story, including romance, sexuality between adult characters, violence, conflict, and morally gray or dark material. Follow the user's lead on tone and intensity, and let scenes build naturally rather than rushing.
 - Write realistically: believable dialogue, distinct character voices, emotional depth, sensory detail, and consistent personalities and world details. Avoid generic, repetitive, or overly sanitized phrasing.
 - Do not speak or act for the user's character. Advance the scene with your own character and the world, and leave room for the user to respond.
-- Keep continuity with earlier messages and the character card or scenario provided.`;
+- Keep continuity with earlier messages and the character card or scenario provided`;
 
 // Prepend (or merge into) the system message
 function applyRoleplayPrompt(messages) {
@@ -51,12 +51,12 @@ function applyRoleplayPrompt(messages) {
 // Model mapping (adjust based on available NIM models)
 const MODEL_MAPPING = {
   'gpt-3.5-turbo': 'deepseek-ai/deepseek-v4.1-flash',
-  'gpt-4': 'moonshotai/kimi-k3',
+  'gpt-4': 'stepfun-ai/step-5-preview',
   'gpt-4-turbo': 'z-ai/glm-5.3-flash',
   'gpt-4o': 'z-ai/glm-5.3',
   'claude-3-opus': 'openai/gpt-oss-120b',
   'claude-3-sonnet': 'openai/gpt-oss-20b',
-  'gemini-pro': 'google/gemma-4-31b-it' 
+  'gemini-pro': 'nvidia/nemotron-3.5-super-vl-120b-a12b' 
 };
 
 // Health check endpoint
